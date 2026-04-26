@@ -41,7 +41,7 @@ python -m http.server 8000
 | **SciPy** | 25+ | 统计检验、信号处理、插值优化、曲线拟合、分布函数 |
 | **seaborn** | 16+ | 散点图、折线图、箱线图、热力图、分布图 |
 | **matplotlib** | 20+ | 基础绑图、子图布局、样式设置、图像保存 |
-| **Python** | 25+ | os, json, re, datetime, glob, pathlib 等标准库 |
+| **Python** | 40+ | os, json, re, datetime, glob, pathlib, shutil, hashlib, csv, statistics, urllib, io, pprint 等标准库 |
 | **collections** | 5+ | Counter, defaultdict, OrderedDict, namedtuple, deque |
 
 ---
@@ -88,7 +88,7 @@ python -m http.server 8000
 
 | 版本 | 更新内容 |
 |---|---|
-| **v3.1.2** | 修复 JSON 数据缺少逗号导致的空白页面问题 |
+| **v3.1.2** | 新增 18 条 Python 标准库指令（shutil, hashlib, csv, statistics, urllib, io, pprint 等）；修复 JSON 缺少逗号问题 |
 | **v3.1.1** | 新增 Python 标准库（os, json, re, datetime, glob, pathlib）、collections 容器库；扩展 scipy/numpy/pandas 指令共 20+ 条 |
 | **v3.0** | 增强参数文档，添加官方完整参数、类型标签、必需/可选标识、默认值显示、参数折叠区 |
 | **v2.0** | 添加 SciPy 库支持、14 类 SVG 图形预览、场景导航增强 |
