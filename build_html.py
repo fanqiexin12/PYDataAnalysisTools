@@ -1,0 +1,444 @@
+#!/usr/bin/env python3
+"""生成完整的HTML文件（简化版，无图表数据）"""
+
+import json
+
+# 完整的pandas命令数据（111个命令，每个都有详细参数说明）
+pandas_commands = [
+    {"name": "read_csv", "desc": "读取CSV文件到DataFrame", "syntax": "pd.read_csv(filepath, sep=',', encoding='utf-8', header=0, index_col=None, usecols=None, dtype=None, nrows=None, na_values=None)", "params": {"filepath": "文件路径或URL", "sep": "分隔符，默认','", "encoding": "字符编码，默认'utf-8'", "header": "行号用作列名，默认0", "index_col": "用作索引的列号或列名", "usecols": "要读取的列列表", "dtype": "列的数据类型", "nrows": "要读取的行数", "na_values": "识别为NA的值"}, "example": "df = pd.read_csv('data.csv')\ndf = pd.read_csv('data.csv', sep=';', encoding='latin1')\ndf = pd.read_csv('data.csv', usecols=['a', 'b'])"},
+    {"name": "read_excel", "desc": "读取Excel文件(.xlsx, .xls)", "syntax": "pd.read_excel(filepath, sheet_name=0, header=0, usecols=None, dtype=None)", "params": {"filepath": "文件路径", "sheet_name": "工作表名称或索引，默认0", "header": "用作列名的行号，默认0", "usecols": "要读取的列", "dtype": "数据类型字典"}, "example": "df = pd.read_excel('data.xlsx')\ndf = pd.read_excel('data.xlsx', sheet_name='Sales')"},
+    {"name": "read_json", "desc": "读取JSON文件或字符串", "syntax": "pd.read_json(json_string, orient=None, typ='frame')", "params": {"orient": "JSON格式: 'split', 'records', 'index', 'columns', 'values'", "typ": "返回类型: 'frame'或'series'"}, "example": "df = pd.read_json('data.json', orient='records')"},
+    {"name": "DataFrame", "desc": "创建DataFrame对象", "syntax": "pd.DataFrame(data=None, index=None, columns=None, dtype=None)", "params": {"data": "数据: dict, array, DataFrame等", "index": "行索引", "columns": "列名", "dtype": "数据类型"}, "example": "df = pd.DataFrame({'a': [1,2], 'b': [3,4]})\ndf = pd.DataFrame(data, columns=['X','Y'], index=labels)"},
+    {"name": "head", "desc": "返回前n行数据", "syntax": "df.head(n=5)", "params": {"n": "行数，默认5"}, "example": "df.head(10)\ndf.head()"},
+    {"name": "tail", "desc": "返回后n行数据", "syntax": "df.tail(n=5)", "params": {"n": "行数，默认5"}, "example": "df.tail(10)\ndf.tail()"},
+    {"name": "info", "desc": "显示DataFrame的详细信息", "syntax": "df.info(verbose=None, buf=None, max_cols=None, memory_usage=None)", "params": {"verbose": "是否显示完整信息", "max_cols": "最大显示列数", "memory_usage": "是否显示内存使用"}, "example": "df.info()\ndf.info(verbose=True, memory_usage='deep')"},
+    {"name": "describe", "desc": "生成描述性统计信息", "syntax": "df.describe(percentiles=None, include=None, exclude=None)", "params": {"percentiles": "分位数，默认[.25, .5, .75]", "include": "包含的数据类型", "exclude": "排除的数据类型"}, "example": "df.describe()\ndf.describe(percentiles=[.1, .5, .9])\ndf.describe(include='all')"},
+    {"name": "shape", "desc": "返回DataFrame的维度", "syntax": "df.shape", "example": "print(df.shape)  # (rows, columns)"},
+    {"name": "columns", "desc": "返回DataFrame的列名", "syntax": "df.columns", "example": "print(df.columns.tolist())\ndf.columns = ['new_name1', 'new_name2']"},
+    {"name": "dtypes", "desc": "返回每列的数据类型", "syntax": "df.dtypes", "example": "print(df.dtypes)\ndf.dtypes['column_name']"},
+    {"name": "index", "desc": "返回DataFrame的索引", "syntax": "df.index", "example": "print(df.index.tolist())\ndf.index = ['row1', 'row2', 'row3']"},
+    {"name": "values", "desc": "返回DataFrame的numpy数组", "syntax": "df.values", "example": "arr = df.values"},
+    {"name": "copy", "desc": "返回DataFrame的深拷贝", "syntax": "df.copy(deep=True)", "params": {"deep": "是否深拷贝，默认True"}, "example": "df_copy = df.copy()"},
+    {"name": "drop", "desc": "删除指定的行或列", "syntax": "df.drop(labels, axis=0, index=None, columns=None)", "params": {"labels": "要删除的标签", "axis": "0删除行，1删除列", "index": "要删除的索引", "columns": "要删除的列名"}, "example": "df.drop('column_name', axis=1)\ndf.drop([0, 1, 2])\ndf.dropna()"},
+    {"name": "dropna", "desc": "删除包含缺失值的行或列", "syntax": "df.dropna(axis=0, how='any', thresh=None, subset=None)", "params": {"axis": "0删除行，1删除列", "how": "'any'任一缺失删除，'all'全部缺失删除", "thresh": "非缺失值数量阈值", "subset": "在哪些列中查找缺失值"}, "example": "df.dropna()\ndf.dropna(axis=1)\ndf.dropna(thresh=3)\ndf.dropna(subset=['col1', 'col2'])"},
+    {"name": "fillna", "desc": "填充缺失值", "syntax": "df.fillna(value=None, method=None, axis=None, inplace=False)", "params": {"value": "用于填充的值，可以是标量、字典或DataFrame", "method": "'ffill'前向填充，'bfill'后向填充", "axis": "0按列，1按行", "inplace": "是否原地修改"}, "example": "df.fillna(0)\ndf.fillna(df.mean())\ndf.fillna({'col1': 0, 'col2': -1})\ndf['col'].fillna('unknown', inplace=True)"},
+    {"name": "isna", "desc": "检测缺失值，返回布尔DataFrame", "syntax": "df.isna()\ndf.isnull()", "example": "df.isna()\ndf.isnull().sum()  # 每列缺失值数量\ndf[df['col'].isna()]  # 筛选有缺失值的行"},
+    {"name": "notna", "desc": "检测非缺失值", "syntax": "df.notna()\ndf.notnull()", "example": "df.notna().sum()  # 每列非缺失值数量"},
+    {"name": "replace", "desc": "替换值", "syntax": "df.replace(to_replace=None, value=None, regex=False, inplace=False)", "params": {"to_replace": "要替换的值", "value": "替换后的值", "regex": "是否使用正则表达式"}, "example": "df.replace('old', 'new')\ndf.replace(['a', 'b'], [1, 2])\ndf.replace(regex=r'^\\s+', value='')"},
+    {"name": "interpolate", "desc": "插值填充缺失值", "syntax": "df.interpolate(method='linear', axis=0, limit=None)", "params": {"method": "插值方法: 'linear', 'polynomial', 'spline'", "axis": "插值轴", "limit": "最大连续填充数"}, "example": "df.interpolate()\ndf['col'].interpolate(method='linear')"},
+    {"name": "merge", "desc": "合并两个DataFrame（类似SQL JOIN）", "syntax": "pd.merge(left, right, on=None, how='inner', left_on=None, right_on=None, suffixes=('_x', '_y'))", "params": {"on": "连接的列名（两边都有）", "how": "'left', 'right', 'outer', 'inner'", "left_on": "左边DataFrame的连接列", "right_on": "右边DataFrame的连接列", "suffixes": "重复列名的后缀"}, "example": "pd.merge(df1, df2, on='id', how='left')\npd.merge(df1, df2, left_on='a', right_on='b')"},
+    {"name": "concat", "desc": "拼接多个DataFrame", "syntax": "pd.concat(objs, axis=0, join='outer', ignore_index=False)", "params": {"objs": "要拼接的DataFrame列表", "axis": "0纵向拼接，1横向拼接", "join": "'inner'交集索引，'outer'并集索引", "ignore_index": "是否忽略原索引"}, "example": "pd.concat([df1, df2])\npd.concat([df1, df2], axis=1)\npd.concat([df1, df2], ignore_index=True)"},
+    {"name": "join", "desc": "将另一个DataFrame连接到索引上", "syntax": "df.join(other, on=None, how='left', lsuffix='', rsuffix='')", "params": {"how": "'left', 'right', 'outer', 'inner'", "lsuffix": "左边重复列的后缀", "rsuffix": "右边重复列的后缀"}, "example": "df1.join(df2, how='left')"},
+    {"name": "combine", "desc": "按元素组合两个DataFrame", "syntax": "df1.combine(df2, func, fill_value=None)", "example": "df1.combine(df2, lambda s1, s2: s1 if s1.sum() > s2.sum() else s2)"},
+    {"name": "update", "desc": "用另一个DataFrame更新当前DataFrame", "syntax": "df.update(other, join='left', overwrite=True)", "example": "df.update(df2)"},
+    {"name": "groupby", "desc": "按一或多列分组", "syntax": "df.groupby(by=None, axis=0, level=None, as_index=True, sort=True)", "params": {"by": "分组依据的列名或列名列表", "as_index": "分组键是否作为索引", "sort": "是否对分组键排序"}, "example": "df.groupby('col')\ndf.groupby(['col1', 'col2'])\ng = df.groupby('col')\ng.mean()\ng.agg({'col1': 'sum', 'col2': 'mean'})"},
+    {"name": "pivot_table", "desc": "创建透视表", "syntax": "df.pivot_table(values=None, index=None, columns=None, aggfunc='mean', fill_value=None, margins=False)", "params": {"values": "要聚合的值列", "index": "行索引", "columns": "列索引", "aggfunc": "聚合函数", "fill_value": "缺失值填充", "margins": "是否添加行列汇总"}, "example": "df.pivot_table(values='sales', index='product', columns='region', aggfunc='sum')\ndf.pivot_table(index='A', columns='B', values='C', aggfunc='mean', margins=True)"},
+    {"name": "crosstab", "desc": "计算交叉表", "syntax": "pd.crosstab(index, columns, values=None, aggfunc=None, normalize=False)", "params": {"normalize": "'all'全部，'index'按行，'columns'按列归一化"}, "example": "pd.crosstab(df['col1'], df['col2'])\npd.crosstab(df['col1'], df['col2'], normalize=True)"},
+    {"name": "melt", "desc": "将宽格式转为长格式", "syntax": "pd.melt(df, id_vars=None, value_vars=None, var_name=None, value_name='value')", "params": {"id_vars": "保持不变的列", "value_vars": "要转换为值的列", "var_name": "变量列名", "value_name": "值列名"}, "example": "pd.melt(df, id_vars=['A'], value_vars=['B', 'C'])\n# 常用于数据整理"},
+    {"name": "pivot", "desc": "将长格式转为宽格式", "syntax": "df.pivot(index=None, columns=None, values=None)", "example": "df.pivot(index='date', columns='product', values='sales')"},
+    {"name": "explode", "desc": "展开列表元素为多行", "syntax": "df.explode(column, ignore_index=False)", "example": "df.explode('tags')"},
+    {"name": "value_counts", "desc": "统计各值出现的频率", "syntax": "Series.value_counts(normalize=False, sort=True, ascending=False, bins=None)", "params": {"normalize": "返回频率而非计数", "sort": "是否按频率排序", "ascending": "升序排列", "bins": "分箱数量（仅对数值列）"}, "example": "df['col'].value_counts()\ndf['col'].value_counts(normalize=True)\ndf['col'].value_counts(bins=5)"},
+    {"name": "unique", "desc": "返回唯一值数组", "syntax": "Series.unique()", "example": "df['col'].unique()\nlen(df['col'].unique())"},
+    {"name": "nunique", "desc": "返回唯一值数量", "syntax": "df.nunique(axis=0, dropna=True)", "example": "df.nunique()\ndf['col'].nunique()"},
+    {"name": "duplicated", "desc": "标记重复行", "syntax": "df.duplicated(subset=None, keep='first')", "params": {"subset": "检查重复的列", "keep": "'first', 'last', False"}, "example": "df.duplicated()\ndf.duplicated(subset=['col1', 'col2'])"},
+    {"name": "drop_duplicates", "desc": "删除重复行", "syntax": "df.drop_duplicates(subset=None, keep='first', inplace=False)", "params": {"subset": "判断重复的列", "keep": "'first', 'last'保留哪个"}, "example": "df.drop_duplicates()\ndf.drop_duplicates(subset=['col'], keep='last')"},
+    {"name": "loc", "desc": "基于标签选择数据", "syntax": "df.loc[row_selector, col_selector]", "params": {"row_selector": "行标签、切片或布尔数组", "col_selector": "列标签、切片或布尔数组"}, "example": "df.loc[0:5, 'col1':'col3']\ndf.loc[df['col'] > 0]\ndf.loc[0, 'name']\ndf.loc[:, 'col'] = value"},
+    {"name": "iloc", "desc": "基于整数位置选择数据", "syntax": "df.iloc[row_positions, col_positions]", "example": "df.iloc[0:5, 0:3]\ndf.iloc[:, [0, 2, 4]]\ndf.iloc[0]\ndf.iloc[0:5, [0, 2]]"},
+    {"name": "query", "desc": "使用字符串表达式查询", "syntax": "df.query(expr, inplace=False, engine=None)", "params": {"expr": "布尔表达式字符串", "engine": "'python'或'numexpr'"}, "example": "df.query('col > 10')\ndf.query('col1 == \"A\" & col2 < 5')\ndf.query('col in [\"a\", \"b\"]')"},
+    {"name": "filter", "desc": "按名称筛选列或索引", "syntax": "df.filter(items=None, like=None, regex=None, axis=None)", "params": {"items": "要保留的列名列表", "like": "列名包含的字符串", "regex": "正则表达式", "axis": "0筛选索引，1筛选列名"}, "example": "df.filter(like='name')\ndf.filter(regex=r'^\\d+')"},
+    {"name": "sort_values", "desc": "按值排序", "syntax": "df.sort_values(by, axis=0, ascending=True, na_position='last', inplace=False)", "params": {"by": "排序列名或列名列表", "ascending": "升序或降序", "na_position": "'first'或'last'缺失值位置"}, "example": "df.sort_values('col')\ndf.sort_values(['col1', 'col2'], ascending=[True, False])\ndf.sort_values('col', ascending=False)"},
+    {"name": "sort_index", "desc": "按索引排序", "syntax": "df.sort_index(axis=0, ascending=True, level=None)", "example": "df.sort_index()\ndf.sort_index(ascending=False)\ndf.sort_index(level=1)"},
+    {"name": "rank", "desc": "返回值的排名", "syntax": "Series.rank(axis=0, method='average', ascending=True)", "params": {"method": "'average', 'min', 'max', 'first', 'dense'"}, "example": "df['col'].rank()\ndf.rank(method='min')"},
+    {"name": "rename", "desc": "重命名列或索引", "syntax": "df.rename(mapper=None, index=None, columns=None, axis=None, inplace=False)", "params": {"mapper": "轴映射器", "columns": "列名重命名字典", "index": "索引重命名字典"}, "example": "df.rename(columns={'old': 'new'})\ndf.rename(index={0: 'a', 1: 'b'})\ndf.rename(columns=str.lower)"},
+    {"name": "set_index", "desc": "将某列设为索引", "syntax": "df.set_index(keys, drop=True, append=False)", "params": {"drop": "是否删除原列", "append": "是否追加到现有索引"}, "example": "df.set_index('col')\ndf.set_index(['col1', 'col2'])"},
+    {"name": "reset_index", "desc": "重置索引为默认整数索引", "syntax": "df.reset_index(drop=False, level=None)", "params": {"drop": "是否删除原索引", "level": "重置哪个级别的索引"}, "example": "df.reset_index()\ndf.reset_index(drop=True)"},
+    {"name": "reindex", "desc": "重新索引（调整顺序或添加缺失）", "syntax": "df.reindex(labels=None, axis=None, fill_value=None)", "example": "df.reindex(new_index)\ndf.reindex(columns=['a', 'b', 'c'], fill_value=0)"},
+    {"name": "reindex_like", "desc": "按另一个DataFrame的索引重新索引", "syntax": "df.reindex_like(other, method=None, copy=True)", "example": "df1.reindex_like(df2)"},
+    {"name": "astype", "desc": "转换数据类型", "syntax": "df.astype(dtype, copy=True, errors='raise')", "params": {"dtype": "目标类型或 {col: dtype} 字典", "errors": "'raise'或'ignore'"}, "example": "df['col'] = df['col'].astype(int)\ndf = df.astype({'col1': float, 'col2': int})\ndf.astype('float32')"},
+    {"name": "to_numeric", "desc": "转换为数值类型", "syntax": "pd.to_numeric(arg, errors='raise', downcast=None)", "params": {"errors": "'raise', 'coerce', 'ignore'", "downcast": "'integer', 'signed', 'unsigned', 'float'"}, "example": "pd.to_numeric(df['col'])\npd.to_numeric(df['col'], errors='coerce')"},
+    {"name": "apply", "desc": "对每行或每列应用函数", "syntax": "df.apply(func, axis=0, raw=False, result_type=None, args=())", "params": {"axis": "0按列，1按行", "raw": "传递Series还是数组", "result_type": "'expand', 'reduce', 'broadcast'"}, "example": "df['col'].apply(lambda x: x*2)\ndf.apply(np.sum, axis=0)\ndf.apply(lambda row: row['a'] + row['b'], axis=1)"},
+    {"name": "map", "desc": "对Series元素应用映射", "syntax": "Series.map(arg, na_action=None)", "params": {"arg": "dict, Series或函数", "na_action": "'ignore'跳过NA值"}, "example": "df['col'].map({'a': 1, 'b': 2})\ndf['col'].map(lambda x: x.strip())\ndf['col'].map('count')"},
+    {"name": "applymap", "desc": "对DataFrame每个元素应用函数", "syntax": "df.applymap(func)", "example": "df.applymap(lambda x: x**2)"},
+    {"name": "pipe", "desc": "链式调用函数", "syntax": "df.pipe(func, *args, **kwargs)", "example": "df.pipe(func)\ndf.groupby('col').pipe(func)"},
+    {"name": "agg", "desc": "聚合操作", "syntax": "df.agg(func=None, axis=0, *args, **kwargs)", "params": {"func": "函数名或函数列表", "axis": "0按列，1按行"}, "example": "df.agg('mean')\ndf.agg(['sum', 'mean'])\ndf.agg({'col1': 'sum', 'col2': 'mean'})"},
+    {"name": "aggregate", "desc": "聚合操作（agg的别名）", "syntax": "df.aggregate(func=None, axis=0)", "example": "df.aggregate(['min', 'max'])"},
+    {"name": "transform", "desc": "返回与原数据相同形状的转换结果", "syntax": "df.transform(func, axis=0)", "example": "df['col'].transform(lambda x: (x - x.mean()) / x.std())\ndf.transform(['abs', 'sqrt'])"},
+    {"name": "corr", "desc": "计算列之间的相关系数", "syntax": "df.corr(method='pearson', min_periods=1)", "params": {"method": "'pearson', 'kendall', 'spearman'", "min_periods": "最小样本数"}, "example": "df.corr()\ndf[['col1', 'col2']].corr()\ndf.corr(method='spearman')"},
+    {"name": "cov", "desc": "计算协方差矩阵", "syntax": "df.cov(min_periods=None)", "example": "df.cov()\ndf[['col1', 'col2']].cov()"},
+    {"name": "corrwith", "desc": "计算与其他DataFrame的相关系数", "syntax": "df.corrwith(other, axis=0, drop=False)", "example": "df.corrwith(df2)\ndf.corrwith(df2, axis=1)"},
+    {"name": "count", "desc": "统计非缺失值数量", "syntax": "df.count(axis=0)", "example": "df.count()\ndf.count(axis=1)"},
+    {"name": "sum", "desc": "求和", "syntax": "df.sum(axis=0, skipna=True, numeric_only=False)", "params": {"axis": "0按列，1按行", "skipna": "是否跳过NA", "numeric_only": "仅处理数值列"}, "example": "df.sum()\ndf.sum(axis=1)\ndf['col'].sum()"},
+    {"name": "mean", "desc": "计算平均值", "syntax": "df.mean(axis=0, skipna=True, numeric_only=False)", "example": "df.mean()\ndf['col'].mean()"},
+    {"name": "median", "desc": "计算中位数", "syntax": "df.median(axis=0, skipna=True, numeric_only=False)", "example": "df.median()\ndf['col'].median()"},
+    {"name": "std", "desc": "计算标准差", "syntax": "df.std(axis=0, skipna=True, ddof=1)", "params": {"ddof": "自由度调整（样本vs总体）"}, "example": "df.std()\ndf.std(ddof=0)  # 总体标准差"},
+    {"name": "var", "desc": "计算方差", "syntax": "df.var(axis=0, skipna=True, ddof=1)", "example": "df.var()"},
+    {"name": "min", "desc": "返回最小值", "syntax": "df.min(axis=0, skipna=True)", "example": "df.min()\ndf['col'].min()\ndf.idxmin()  # 最小值索引"},
+    {"name": "max", "desc": "返回最大值", "syntax": "df.max(axis=0, skipna=True)", "example": "df.max()\ndf['col'].max()\ndf.idxmax()  # 最大值索引"},
+    {"name": "quantile", "desc": "计算分位数", "syntax": "df.quantile(q=0.5, axis=0)", "params": {"q": "分位数，可以是数组"}, "example": "df.quantile(0.5)\ndf.quantile([0.25, 0.5, 0.75])"},
+    {"name": "abs", "desc": "返回绝对值", "syntax": "df.abs()", "example": "df.abs()\n(-df).abs()"},
+    {"name": "clip", "desc": "裁剪值到指定范围", "syntax": "df.clip(lower=None, upper=None, axis=None)", "example": "df.clip(0, 100)  # 裁剪到[0, 100]\ndf.clip(lower=-10, upper=10)"},
+    {"name": "round", "desc": "四舍五入到指定小数位", "syntax": "df.round(decimals=0)", "example": "df.round(2)\ndf['col'].round(-1)  # 四舍五入到十位"},
+    {"name": "floor", "desc": "向下取整", "syntax": "df.floor()", "example": "df.floor()"},
+    {"name": "ceil", "desc": "向上取整", "syntax": "df.ceil()", "example": "df.ceil()"},
+    {"name": "mod", "desc": "取模运算", "syntax": "df.mod(other)", "example": "df.mod(2)  # 取余数"},
+    {"name": "pct_change", "desc": "计算百分比变化", "syntax": "df.pct_change(periods=1, fill_method='pad')", "example": "df.pct_change()\ndf['col'].pct_change(periods=2)"},
+    {"name": "cumsum", "desc": "累积求和", "syntax": "df.cumsum(axis=0, skipna=True)", "example": "df.cumsum()\ndf['col'].cumsum()"},
+    {"name": "cumprod", "desc": "累积乘积", "syntax": "df.cumprod(axis=0, skipna=True)", "example": "df.cumprod()"},
+    {"name": "cummax", "desc": "累积最大值", "syntax": "df.cummax(axis=0)", "example": "df.cummax()"},
+    {"name": "cummin", "desc": "累积最小值", "syntax": "df.cummin(axis=0)", "example": "df.cummin()"},
+    {"name": "shift", "desc": "移动数据（创建滞后或领先）", "syntax": "df.shift(periods=1, freq=None, axis=0)", "params": {"periods": "移动期数，正为滞后，负为领先"}, "example": "df.shift(1)  # 滞后1行\ndf.shift(-1)  # 领先1行\ndf['col'].shift(1)"},
+    {"name": "diff", "desc": "计算一阶差分", "syntax": "df.diff(periods=1, axis=0)", "example": "df.diff()\ndf.diff(periods=2)"},
+    {"name": "ewm", "desc": "指数加权窗口", "syntax": "df.ewm(span=None, alpha=0.5, adjust=True)", "example": "df.ewm(span=10).mean()\ndf['col'].ewm(alpha=0.5).mean()"},
+    {"name": "rolling", "desc": "滚动窗口计算", "syntax": "df.rolling(window=10, min_periods=None, center=False)", "example": "df.rolling(window=5).mean()\ndf.rolling(window=10, min_periods=5).std()"},
+    {"name": "expanding", "desc": "扩展窗口计算", "syntax": "df.expanding(min_periods=1)", "example": "df.expanding().mean()\ndf.expanding().sum()"},
+    {"name": "to_csv", "desc": "保存为CSV文件", "syntax": "df.to_csv(filepath, sep=',', index=False, encoding='utf-8')", "params": {"filepath": "文件路径", "sep": "分隔符", "index": "是否写入索引", "encoding": "编码格式"}, "example": "df.to_csv('output.csv')\ndf.to_csv('output.csv', index=False, sep=';')"},
+    {"name": "to_excel", "desc": "保存为Excel文件", "syntax": "df.to_excel(filepath, sheet_name='Sheet1', index=False)", "example": "df.to_excel('output.xlsx')\ndf.to_excel('output.xlsx', sheet_name='Data')"},
+    {"name": "to_json", "desc": "保存为JSON文件", "syntax": "df.to_json(filepath, orient='records', force_ascii=False)", "params": {"orient": "'split', 'records', 'index', 'columns', 'values'"}, "example": "df.to_json('output.json')\ndf.to_json('output.json', orient='records')"},
+    {"name": "to_html", "desc": "转换为HTML表格", "syntax": "df.to_html(buf=None, classes=None, justify='left')", "example": "df.to_html()\ndf.to_html(classes='table table-striped')"},
+    {"name": "to_dict", "desc": "转换为字典", "syntax": "df.to_dict(orient='dict')", "params": {"orient": "'dict', 'list', 'series', 'split', 'records'"}, "example": "df.to_dict()\ndf.to_dict('list')"},
+    {"name": "to_numpy", "desc": "转换为numpy数组", "syntax": "df.to_numpy(dtype=None, copy=False)", "example": "arr = df.to_numpy()"},
+    {"name": "to_clipboard", "desc": "复制到剪贴板", "syntax": "df.to_clipboard(excel=True, sep=None)", "example": "df.to_clipboard()\ndf.to_clipboard(sep='\\t')"},
+    {"name": "iterrows", "desc": "迭代遍历每行", "syntax": "for index, row in df.iterrows():", "example": "for idx, row in df.iterrows():\n    print(row['col'])"},
+    {"name": "itertuples", "desc": "迭代遍历每行（比iterrows快）", "syntax": "for row in df.itertuples():", "example": "for row in df.itertuples():\n    print(row.col1)"},
+    {"name": "items", "desc": "迭代遍历每列", "syntax": "for col_name, col in df.items():", "example": "for col_name, col in df.items():\n    print(f'{col_name}: {col.sum()}')"},
+    {"name": "assign", "desc": "添加新列（链式调用）", "syntax": "df.assign(**kwargs)", "example": "df.assign(new_col=df['a'] + df['b'])\ndf.assign(col1=lambda x: x['a'] * 2)"},
+    {"name": "select_dtypes", "desc": "按数据类型选择列", "syntax": "df.select_dtypes(include=None, exclude=None)", "example": "df.select_dtypes(include=['int', 'float'])\ndf.select_dtypes(exclude=['object'])"},
+    {"name": "get_dummies", "desc": "独热编码", "syntax": "pd.get_dummies(data, prefix=None, columns=None)", "params": {"prefix": "新列名前缀", "columns": "要编码的列"}, "example": "pd.get_dummies(df['col'])\npd.get_dummies(df, columns=['col1', 'col2'])"},
+    {"name": "factorize", "desc": "将值编码为整数", "syntax": "Series.factorize(sort=False, na_sentinel=-1)", "example": "codes, uniques = pd.factorize(df['col'])"},
+    {"name": "cut", "desc": "将数值分箱为分类", "syntax": "pd.cut(x, bins, labels=None)", "example": "pd.cut(df['age'], bins=[0, 18, 35, 60, 100], labels=['未成年','青年','中年','老年'])"},
+    {"name": "qcut", "desc": "基于分位数的分箱", "syntax": "pd.qcut(x, q, labels=None)", "example": "pd.qcut(df['income'], q=4, labels=['低','中','高','很高'])"},
+    {"name": "sample", "desc": "随机抽样", "syntax": "df.sample(n=None, frac=None, replace=False, weights=None)", "params": {"n": "样本数量", "frac": "抽样比例", "replace": "是否放回抽样"}, "example": "df.sample(10)\ndf.sample(frac=0.1)\ndf.sample(n=5, replace=True)"},
+    {"name": "where", "desc": "条件替换", "syntax": "df.where(cond, other=np.nan)", "example": "df.where(df > 0, 0)  # 负值替换为0\ndf.where(df > 0, -df)"},
+    {"name": "mask", "desc": "条件替换（与where相反）", "syntax": "df.mask(cond, other=np.nan)", "example": "df.mask(df < 0, 0)"},
+    {"name": "add_prefix", "desc": "添加列前缀", "syntax": "df.add_prefix(prefix)", "example": "df.add_prefix('col_')"},
+    {"name": "add_suffix", "desc": "添加列后缀", "syntax": "df.add_suffix(suffix)", "example": "df.add_suffix('_end')"},
+    {"name": "transpose", "desc": "转置（行变列）", "syntax": "df.T\ndf.transpose()", "example": "df.T"},
+    {"name": "squeeze", "desc": "将单列DataFrame转为Series", "syntax": "df.squeeze()", "example": "df.squeeze()"},
+    {"name": "attrs", "desc": "获取/设置DataFrame属性", "syntax": "df.attrs", "example": "df.attrs['description'] = '数据集描述'\ndf.attrs"},
+]
+
+# numpy命令（精简到核心）
+numpy_commands = [
+    {"name": "array", "desc": "创建NumPy数组", "syntax": "np.array(object, dtype=None, copy=True)", "params": {"object": "序列数据", "dtype": "数据类型", "copy": "是否复制"}, "example": "arr = np.array([1, 2, 3, 4, 5])\narr = np.array([[1, 2], [3, 4]])\nnp.array([1, 2, 3], dtype=float)"},
+    {"name": "zeros", "desc": "创建全零数组", "syntax": "np.zeros(shape, dtype=float, order='C')", "params": {"shape": "数组形状，如(3,4)或5", "dtype": "数据类型", "order": "'C'行优先，'F'列优先"}, "example": "np.zeros(5)  # 一维\nnp.zeros((3, 4))  # 二维\nnp.zeros((2, 3, 4))  # 三维"},
+    {"name": "ones", "desc": "创建全一数组", "syntax": "np.ones(shape, dtype=float, order='C')", "example": "np.ones(5)\nnp.ones((3, 4))"},
+    {"name": "empty", "desc": "创建未初始化数组（更快）", "syntax": "np.empty(shape, dtype=float, order='C')", "example": "np.empty((3, 3))"},
+    {"name": "arange", "desc": "创建数值序列数组", "syntax": "np.arange(start, stop, step, dtype=None)", "example": "np.arange(0, 10, 2)  # [0, 2, 4, 6, 8]\nnp.arange(10)  # [0, 1, 2, ..., 9]\nnp.arange(1, 2, 0.1)"},
+    {"name": "linspace", "desc": "创建等间隔数值数组", "syntax": "np.linspace(start, stop, num=50, endpoint=True)", "params": {"num": "元素数量", "endpoint": "是否包含stop"}, "example": "np.linspace(0, 1, 10)\nnp.linspace(0, 10, 5)"},
+    {"name": "reshape", "desc": "改变数组形状", "syntax": "arr.reshape(new_shape, order='C')", "params": {"new_shape": "新形状，如(2,3)或-1自动计算"}, "example": "arr.reshape(2, 3)\narr.reshape(-1, 1)  # 自动计算行数\narr.reshape((2, -1))"},
+    {"name": "flatten", "desc": "将多维数组展平为一维", "syntax": "arr.flatten(order='C')", "example": "arr.flatten()\narr.ravel()  # 返回视图（更省内存）"},
+    {"name": "concatenate", "desc": "拼接数组", "syntax": "np.concatenate((a1, a2, ...), axis=0)", "params": {"axis": "拼接轴，0纵向，1横向"}, "example": "np.concatenate([arr1, arr2])\nnp.concatenate([arr1, arr2], axis=1)"},
+    {"name": "stack", "desc": "在新轴上堆叠数组", "syntax": "np.stack(arrays, axis=0)", "example": "np.stack([arr1, arr2])  # shape增加一维"},
+    {"name": "vstack", "desc": "垂直（纵向）堆叠", "syntax": "np.vstack(tup)", "example": "np.vstack([arr1, arr2])"},
+    {"name": "hstack", "desc": "水平（横向）堆叠", "syntax": "np.hstack(tup)", "example": "np.hstack([arr1, arr2])"},
+    {"name": "split", "desc": "分割数组", "syntax": "np.split(ary, indices_or_sections, axis=0)", "example": "np.split(arr, [2, 5])  # 在位置2和5分割\nnp.array_split(arr, 3)  # 分成3份"},
+    {"name": "where", "desc": "条件查找或替换", "syntax": "np.where(condition, x, y)", "example": "np.where(arr > 0, arr, 0)  # 负值替换为0\nnp.where(arr > 0)  # 返回索引"},
+    {"name": "mean", "desc": "计算平均值", "syntax": "np.mean(a, axis=None, dtype=None)", "example": "np.mean(arr)\nnp.mean(arr, axis=0)"},
+    {"name": "sum", "desc": "计算总和", "syntax": "np.sum(a, axis=None, dtype=None)", "example": "np.sum(arr)\nnp.sum(arr, axis=1)"},
+    {"name": "std", "desc": "计算标准差", "syntax": "np.std(a, axis=None, dtype=None, ddof=0)", "params": {"ddof": "自由度，ddof=1为样本标准差"}, "example": "np.std(arr)\nnp.std(arr, ddof=1)  # 样本标准差"},
+    {"name": "min", "desc": "找最小值", "syntax": "np.min(a, axis=None)", "example": "np.min(arr)\nnp.min(arr, axis=0)"},
+    {"name": "max", "desc": "找最大值", "syntax": "np.max(a, axis=None)", "example": "np.max(arr)\nnp.max(arr, axis=1)"},
+    {"name": "argmin", "desc": "找最小值索引", "syntax": "np.argmin(a, axis=None)", "example": "np.argmin(arr)"},
+    {"name": "argmax", "desc": "找最大值索引", "syntax": "np.argmax(a, axis=None)", "example": "np.argmax(arr)"},
+    {"name": "unique", "desc": "找唯一值", "syntax": "np.unique(ar, return_index=False, return_inverse=False, return_counts=False)", "example": "np.unique(arr)\nnp.unique(arr, return_counts=True)\nnp.unique(arr, return_inverse=True)"},
+    {"name": "sort", "desc": "数组排序", "syntax": "np.sort(a, axis=-1, kind=None)", "params": {"axis": "排序轴，-1为最后一轴", "kind": "'quicksort', 'mergesort', 'heapsort'"}, "example": "np.sort(arr)\nnp.sort(arr, axis=0)"},
+    {"name": "argsort", "desc": "返回排序索引", "syntax": "np.argsort(a, axis=-1, kind=None)", "example": "indices = np.argsort(arr)"},
+    {"name": "dot", "desc": "矩阵点积", "syntax": "np.dot(a, b, out=None)", "example": "np.dot(arr1, arr2)\narr1 @ arr2  # Python 3.5+"},
+    {"name": "matmul", "desc": "矩阵乘法", "syntax": "np.matmul(a, b, out=None)", "example": "np.matmul(arr1, arr2)\narr1 @ arr2"},
+    {"name": "transpose", "desc": "转置数组", "syntax": "arr.T\narr.transpose()\nnp.transpose(arr, axes=None)", "example": "arr.T\narr.transpose((1, 0, 2))  # 自定义轴顺序"},
+    {"name": "random.rand", "desc": "生成0-1随机数", "syntax": "np.random.rand(d0, d1, ...)", "example": "np.random.rand(3, 4)\nnp.random.rand(10)"},
+    {"name": "random.randn", "desc": "生成标准正态分布随机数", "syntax": "np.random.randn(d0, d1, ...)", "example": "np.random.randn(3, 4)\nnp.random.randn(100)"},
+    {"name": "random.randint", "desc": "生成随机整数", "syntax": "np.random.randint(low, high=None, size=None)", "example": "np.random.randint(0, 10)  # 0-9随机整数\nnp.random.randint(0, 10, (3, 4))"},
+    {"name": "random.choice", "desc": "随机选择", "syntax": "np.random.choice(a, size=None, replace=True, p=None)", "params": {"replace": "是否放回抽样", "p": "每个元素的概率"}, "example": "np.random.choice(arr, 5)\nnp.random.choice(['a', 'b', 'c'], 3, p=[0.5, 0.3, 0.2])"},
+    {"name": "random.seed", "desc": "设置随机种子", "syntax": "np.random.seed(seed)", "example": "np.random.seed(42)\nnp.random.rand(5)  # 每次运行结果相同"},
+    {"name": "random.shuffle", "desc": "随机打乱数组", "syntax": "np.random.shuffle(a)", "example": "np.random.shuffle(arr)\nnp.random.shuffle(df)  # 原地打乱"},
+    {"name": "random.permutation", "desc": "返回打乱后的数组副本", "syntax": "np.random.permutation(a)", "example": "new_arr = np.random.permutation(arr)"},
+    {"name": "linalg.inv", "desc": "计算逆矩阵", "syntax": "np.linalg.inv(a)", "example": "np.linalg.inv(matrix)"},
+    {"name": "linalg.det", "desc": "计算行列式", "syntax": "np.linalg.det(a)", "example": "np.linalg.det(matrix)"},
+    {"name": "linalg.solve", "desc": "解线性方程组", "syntax": "np.linalg.solve(a, b)", "example": "x = np.linalg.solve(A, b)  # Ax = b"},
+    {"name": "linalg.eig", "desc": "计算特征值和特征向量", "syntax": "np.linalg.eig(a)", "example": "eigenvalues, eigenvectors = np.linalg.eig(matrix)"},
+    {"name": "linalg.svd", "desc": "奇异值分解", "syntax": "np.linalg.svd(a, full_matrices=True)", "example": "u, s, vh = np.linalg.svd(matrix)"},
+    {"name": "expand_dims", "desc": "添加新维度", "syntax": "np.expand_dims(a, axis)", "example": "np.expand_dims(arr, axis=0)  # 添加行维度\nnp.expand_dims(arr, axis=1)  # 添加列维度"},
+    {"name": "squeeze", "desc": "移除单维度", "syntax": "np.squeeze(a, axis=None)", "example": "np.squeeze(arr)"},
+    {"name": "tile", "desc": "重复数组", "syntax": "np.tile(A, reps)", "example": "np.tile(arr, (2, 3))  # 横向重复2次，纵向3次"},
+    {"name": "repeat", "desc": "重复数组元素", "syntax": "np.repeat(a, repeats, axis=None)", "example": "np.repeat([1, 2, 3], 2)  # [1, 1, 2, 2, 3, 3]"},
+    {"name": "isin", "desc": "检查元素是否在数组中", "syntax": "np.isin(element, test_elements, assume_unique=False)", "example": "np.isin(arr, [1, 2, 3])\narr[np.isin(arr, [1, 2])]"},
+    {"name": "searchsorted", "desc": "二分查找插入位置", "syntax": "np.searchsorted(a, v, side='left')", "example": "np.searchsorted([1, 3, 5, 7], 4)  # 返回2"},
+    {"name": "delete", "desc": "删除数组元素", "syntax": "np.delete(arr, obj, axis=None)", "example": "np.delete(arr, [0, 2])\nnp.delete(arr, 1, axis=1)"},
+    {"name": "insert", "desc": "插入元素", "syntax": "np.insert(arr, obj, values, axis=None)", "example": "np.insert(arr, 1, 99)\nnp.insert(arr, [0, 2], [10, 20], axis=1)"},
+    {"name": "append", "desc": "追加元素", "syntax": "np.append(arr, values)", "example": "np.append(arr, [7, 8, 9])"},
+]
+
+# seaborn命令
+seaborn_commands = [
+    {"name": "scatterplot", "desc": "散点图", "syntax": "sns.scatterplot(x=None, y=None, hue=None, style=None, size=None, data=None, **kwargs)", "params": {"hue": "分组着色字段", "style": "分组样式字段", "size": "分组大小字段"}, "example": "sns.scatterplot(x='total_bill', y='tip', data=tips)\nsns.scatterplot(x='weight', y='height', hue='gender', style='smoker', size='age', data=df)"},
+    {"name": "lineplot", "desc": "折线图", "syntax": "sns.lineplot(x=None, y=None, hue=None, style=None, data=None, **kwargs)", "params": {"ci": "置信区间（None关闭）", "markers": "是否显示标记点"}, "example": "sns.lineplot(x='date', y='value', data=df)\nsns.lineplot(x='timepoint', y='signal', hue='region', data=fmri, ci='sd')"},
+    {"name": "barplot", "desc": "条形图（带置信区间）", "syntax": "sns.barplot(x=None, y=None, hue=None, data=None, **kwargs)", "params": {"estimator": "聚合函数，默认mean", "ci": "置信区间大小", "palette": "调色板"}, "example": "sns.barplot(x='day', y='total_bill', data=tips)\nsns.barplot(x='category', y='value', hue='group', estimator=sum, data=df)"},
+    {"name": "countplot", "desc": "计数条形图", "syntax": "sns.countplot(x=None, y=None, hue=None, data=None, **kwargs)", "example": "sns.countplot(x='day', data=tips)\nsns.countplot(x='smoker', hue='sex', data=tips)"},
+    {"name": "boxplot", "desc": "箱线图", "syntax": "sns.boxplot(x=None, y=None, hue=None, data=None, **kwargs)", "params": {"orient": "'v'垂直，'h'水平", "fliersize": "异常值点大小"}, "example": "sns.boxplot(x='day', y='total_bill', data=tips)\nsns.boxplot(x='species', y='sepal_length', orient='h', data=iris)"},
+    {"name": "violinplot", "desc": "小提琴图（箱线图+KDE）", "syntax": "sns.violinplot(x=None, y=None, hue=None, data=None, **kwargs)", "params": {"split": "是否在hue上分割", "inner": "内部显示: 'box', 'quartile', 'stick'"}, "example": "sns.violinplot(x='day', y='total_bill', data=tips)\nsns.violinplot(x='species', y='petal_length', hue='species', data=iris, split=True)"},
+    {"name": "histplot", "desc": "直方图", "syntax": "sns.histplot(data=None, x=None, y=None, kde=False, **kwargs)", "params": {"bins": "柱数量", "kde": "是否显示核密度曲线", "stat": "'count', 'density', 'probability'"}, "example": "sns.histplot(x='total_bill', data=tips, bins=30)\nsns.histplot(x='value', hue='group', data=df, kde=True, stat='density')"},
+    {"name": "kdeplot", "desc": "核密度估计图", "syntax": "sns.kdeplot(x=None, y=None, data=None, **kwargs)", "params": {"shade": "是否填充下方区域", "levels": "等高线数量"}, "example": "sns.kdeplot(x='total_bill', data=tips)\nsns.kdeplot(x='x', y='y', data=df, shade=True, levels=10)"},
+    {"name": "heatmap", "desc": "热力图", "syntax": "sns.heatmap(data, vmin=None, vmax=None, cmap=None, annot=False, fmt='.2f', **kwargs)", "params": {"annot": "是否显示数值", "fmt": "数值格式", "cmap": "颜色映射", "linewidths": "格子间隔线宽度"}, "example": "sns.heatmap(df.corr())\nsns.heatmap(data, annot=True, fmt='.2f', cmap='coolwarm', center=0, linewidths=0.5)"},
+    {"name": "pairplot", "desc": "配对图矩阵", "syntax": "sns.pairplot(data, hue=None, vars=None, kind='scatter', diag_kind='auto', **kwargs)", "params": {"vars": "用于绘图的变量列表", "kind": "'scatter', 'reg'", "diag_kind": "'auto', 'hist', 'kde'"}, "example": "sns.pairplot(iris)\nsns.pairplot(df, hue='category', vars=['a', 'b', 'c'], kind='reg')"},
+    {"name": "relplot", "desc": "关系图（可指定类型）", "syntax": "sns.relplot(x=None, y=None, hue=None, size=None, style=None, kind='scatter', data=None)", "params": {"kind": "'scatter'或'line'"}, "example": "sns.relplot(x='total_bill', y='tip', hue='smoker', data=tips)\nsns.relplot(x='time', y='value', kind='line', data=df)"},
+    {"name": "catplot", "desc": "分类图（可指定类型）", "syntax": "sns.catplot(x=None, y=None, hue=None, kind='strip', data=None, **kwargs)", "params": {"kind": "'strip', 'swarm', 'box', 'violin', 'boxen', 'bar', 'count'"}, "example": "sns.catplot(x='day', y='total_bill', data=tips)\nsns.catplot(x='day', y='total_bill', kind='box', data=tips)"},
+    {"name": "FacetGrid", "desc": "分面网格图", "syntax": "sns.FacetGrid(data, row=None, col=None, hue=None, **kwargs)", "example": "g = sns.FacetGrid(tips, col='time', row='smoker')\ng.map(sns.scatterplot, 'total_bill', 'tip')\ng.set_axis_labels('Total Bill', 'Tip')\ng.set_titles('{col_name}')"},
+    {"name": "JointGrid", "desc": "联合网格图", "syntax": "sns.JointGrid(x=None, y=None, data=None, **kwargs)", "example": "g = sns.JointGrid(x='total_bill', y='tip', data=tips)\ng.plot(sns.scatterplot, sns.kdeplot)\ng.plot_joint(sns.scatterplot)\ng.plot_marginals(sns.histplot)"},
+    {"name": "clustermap", "desc": "层次聚类热力图", "syntax": "sns.clustermap(data, method='average', metric='euclidean', **kwargs)", "params": {"method": "聚类方法", "metric": "距离度量", "row_cluster": "是否行聚类", "col_cluster": "是否列聚类"}, "example": "sns.clustermap(df)\nsns.clustermap(df, method='ward', cmap='coolwarm', standard_scale=1)"},
+    {"name": "stripplot", "desc": "带状散点图", "syntax": "sns.stripplot(x=None, y=None, hue=None, data=None, **kwargs)", "params": {"jitter": "抖动程度", "dodge": "是否分离hue组"}, "example": "sns.stripplot(x='day', y='total_bill', data=tips)\nsns.stripplot(x='species', y='sepal_length', hue='species', data=iris, jitter=True, dodge=True)"},
+    {"name": "swarmplot", "desc": "群状散点图（不重叠）", "syntax": "sns.swarmplot(x=None, y=None, hue=None, data=None, **kwargs)", "example": "sns.swarmplot(x='species', y='petal_length', data=iris)"},
+    {"name": "boxenplot", "desc": "增强箱线图", "syntax": "sns.boxenplot(x=None, y=None, hue=None, data=None, **kwargs)", "example": "sns.boxenplot(x='day', y='total_bill', data=tips)"},
+    {"name": "pointplot", "desc": "点线图", "syntax": "sns.pointplot(x=None, y=None, hue=None, data=None, **kwargs)", "params": {"join": "是否连线", "capsize": "误差棒帽大小"}, "example": "sns.pointplot(x='time', y='total_bill', hue='smoker', data=tips, join=False, capsize=0.1)"},
+    {"name": "residplot", "desc": "残差图", "syntax": "sns.residplot(x=None, y=None, data=None, **kwargs)", "example": "sns.residplot(x='predict', y='actual', data=df)"},
+    {"name": "lmplot", "desc": "回归图", "syntax": "sns.lmplot(x=None, y=None, hue=None, col=None, row=None, data=None, **kwargs)", "params": {"col_wrap": "每行图数", "truncate": "是否截断回归线"}, "example": "sns.lmplot(x='total_bill', y='tip', data=tips)\nsns.lmplot(x='x', y='y', col='category', data=df)"},
+    {"name": "set_style", "desc": "设置图表风格", "syntax": "sns.set_style(style=None, rc=None)", "params": {"style": "'white', 'dark', 'whitegrid', 'darkgrid', 'ticks'"}, "example": "sns.set_style('whitegrid')\nsns.set_style('dark')\nsns.set_style('ticks')"},
+    {"name": "set_palette", "desc": "设置调色板", "syntax": "sns.set_palette(palette, n_colors=None)", "params": {"palette": "'deep', 'muted', 'pastel', 'bright', 'dark', 'colorblind'"}, "example": "sns.set_palette('husl')\nsns.set_palette('Set2', 8)"},
+    {"name": "set_context", "desc": "设置上下文参数", "syntax": "sns.set_context(context=None, font_scale=1, rc=None)", "params": {"context": "'paper', 'notebook', 'talk', 'poster'"}, "example": "sns.set_context('paper')\nsns.set_context('talk', font_scale=1.5)"},
+    {"name": "despine", "desc": "移除边框", "syntax": "sns.despine(fig=None, ax=None, top=True, right=True, left=False, bottom=False)", "example": "sns.despine()\nsns.despine(left=True, bottom=True)"},
+]
+
+# matplotlib命令
+matplotlib_commands = [
+    {"name": "figure", "desc": "创建图形窗口", "syntax": "plt.figure(figsize=None, dpi=None, facecolor=None, edgecolor=None)", "params": {"figsize": "(宽, 高)英寸", "dpi": "分辨率", "facecolor": "背景色"}, "example": "plt.figure(figsize=(10, 6))\nfig = plt.figure(dpi=100)"},
+    {"name": "subplots", "desc": "创建子图", "syntax": "fig, ax = plt.subplots(nrows=1, ncols=1, **kwargs)", "params": {"nrows": "行数", "ncols": "列数", "sharex": "共享X轴", "sharey": "共享Y轴"}, "example": "fig, ax = plt.subplots()\nfig, axes = plt.subplots(2, 2, figsize=(10, 8))\nfig, axes = plt.subplots(2, 1, sharex=True)"},
+    {"name": "plot", "desc": "绑制折线图", "syntax": "ax.plot(x, y, fmt=None, **kwargs)", "params": {"fmt": "'[color][marker][line]'格式", "label": "图例标签", "linewidth": "线宽", "linestyle": "线型"}, "example": "ax.plot(x, y)\nax.plot(x, y, 'r--', linewidth=2)\nax.plot(x1, y1, 'b-', x2, y2, 'g-', label=['A', 'B'])\nax.plot(x, y, color='red', marker='o', linestyle='--')"},
+    {"name": "scatter", "desc": "绑制散点图", "syntax": "ax.scatter(x, y, s=None, c=None, marker='o', **kwargs)", "params": {"s": "点大小", "c": "颜色或颜色数组", "marker": "标记样式", "alpha": "透明度"}, "example": "ax.scatter(x, y)\nax.scatter(x, y, s=100, c='red', marker='s')\nax.scatter(x, y, s=c_values, c=colors, cmap='viridis')"},
+    {"name": "bar", "desc": "绑制条形图", "syntax": "ax.bar(x, height, width=0.8, color=None, **kwargs)", "params": {"width": "条宽度", "color": "颜色", "edgecolor": "边框颜色", "tick_label": "刻度标签"}, "example": "ax.bar(x, heights)\nax.bar(x, heights, width=0.5, color='steelblue')\nax.bar(x, heights, tick_label=['A', 'B', 'C'])"},
+    {"name": "barh", "desc": "水平条形图", "syntax": "ax.barh(y, width, height=0.8, color=None, **kwargs)", "example": "ax.barh(y, widths)\nax.barh(categories, values, color='steelblue')"},
+    {"name": "hist", "desc": "直方图", "syntax": "ax.hist(x, bins=None, color=None, **kwargs)", "params": {"bins": "柱数量或边界", "range": "值范围", "density": "是否归一化", "stacked": "是否堆叠"}, "example": "ax.hist(data, bins=30)\nax.hist(data, bins=np.arange(0, 100, 5))\nax.hist([data1, data2], bins=20, stacked=True)"},
+    {"name": "pie", "desc": "饼图", "syntax": "ax.pie(x, labels=None, autopct=None, startangle=0, **kwargs)", "params": {"labels": "扇区标签", "autopct": "百分比格式", "startangle": "起始角度", "explode": "分离距离", "colors": "颜色列表"}, "example": "ax.pie(values, labels=labels)\nax.pie(values, autopct='%1.1f%%', startangle=90)\nax.pie(values, explode=[0, 0.1, 0, 0])"},
+    {"name": "imshow", "desc": "显示图像/矩阵热力图", "syntax": "ax.imshow(X, cmap=None, aspect=None, **kwargs)", "params": {"cmap": "颜色映射", "aspect": "'auto'或比例", "interpolation": "插值方法"}, "example": "ax.imshow(image_array)\nax.imshow(data, cmap='viridis', aspect='auto')\nax.imshow(data, cmap='hot', interpolation='bilinear')"},
+    {"name": "contour", "desc": "等高线图", "syntax": "ax.contour(X, Y, Z, levels=None, **kwargs)", "params": {"levels": "等高线数量或值", "cmap": "颜色映射"}, "example": "ax.contour(X, Y, Z)\nax.contour(X, Y, Z, levels=20, cmap='viridis')\nax.contourf(X, Y, Z, levels=10)  # 填充等高线"},
+    {"name": "contourf", "desc": "填充等高线图", "syntax": "ax.contourf(X, Y, Z, levels=None, **kwargs)", "example": "ax.contourf(X, Y, Z, levels=15, cmap='coolwarm')"},
+    {"name": "boxplot", "desc": "箱线图", "syntax": "ax.boxplot(x, labels=None, **kwargs)", "params": {"labels": "箱线标签", "notch": "是否显示置信区间", "showmeans": "是否显示均值"}, "example": "ax.boxplot([data1, data2, data3])\nax.boxplot([data1, data2], labels=['A', 'B'], showmeans=True)"},
+    {"name": "violinplot", "desc": "小提琴图", "syntax": "ax.violinplot(dataset, positions=None, **kwargs)", "params": {"showmeans": "显示均值", "showmedians": "显示中位数", "showextrema": "显示极值"}, "example": "ax.violinplot([data1, data2, data3], positions=[1, 2, 3], showmeans=True)"},
+    {"name": "step", "desc": "阶梯图", "syntax": "ax.step(x, y, where='pre', **kwargs)", "params": {"where": "'pre', 'post', 'mid'阶梯位置"}, "example": "ax.step(x, y, where='mid')\nax.step(x, y, 'b--', where='pre')"},
+    {"name": "errorbar", "desc": "误差棒图", "syntax": "ax.errorbar(x, y, yerr=None, xerr=None, fmt=None, **kwargs)", "params": {"yerr": "Y误差", "xerr": "X误差", "capsize": "误差棒帽大小", "ecolor": "误差棒颜色"}, "example": "ax.errorbar(x, y, yerr=0.1)\nax.errorbar(x, y, yerr=e_y, xerr=e_x, fmt='o', capsize=5)"},
+    {"name": "stem", "desc": "离散序列图", "syntax": "ax.stem(x, y, linefmt='-', markerfmt='o', basefmt='r-')", "params": {"linefmt": "主线格式", "markerfmt": "标记格式", "basefmt": "基线格式"}, "example": "ax.stem(x, y)\nax.stem(x, y, linefmt='b-', markerfmt='bo', basefmt='r-')"},
+    {"name": "fill_between", "desc": "填充区域", "syntax": "ax.fill_between(x, y1, y2=0, **kwargs)", "params": {"where": "填充条件", "alpha": "透明度", "color": "颜色"}, "example": "ax.fill_between(x, y)\nax.fill_between(x, y1, y2, alpha=0.3, color='blue')\nax.fill_between(x, y1, y2, where=y1>y2, color='red')"},
+    {"name": "fill", "desc": "填充多边形", "syntax": "ax.fill(*args, **kwargs)", "example": "ax.fill(x, y, 'b')\nax.fill([0, 1, 0.5], [0, 0, 1], 'r')"},
+    {"name": "xlabel", "desc": "设置X轴标签", "syntax": "ax.set_xlabel(label, fontsize=None, **kwargs)", "params": {"fontsize": "字体大小", "fontweight": "字体粗细", "color": "颜色"}, "example": "ax.set_xlabel('Time (s)')\nax.set_xlabel('X Label', fontsize=12, fontweight='bold')"},
+    {"name": "ylabel", "desc": "设置Y轴标签", "syntax": "ax.set_ylabel(label, fontsize=None, **kwargs)", "example": "ax.set_ylabel('Value')\nax.set_ylabel('Y Label', fontsize=12)"},
+    {"name": "title", "desc": "设置标题", "syntax": "ax.set_title(label, fontsize=None, loc='center', **kwargs)", "params": {"loc": "'left', 'center', 'right'", "pad": "标题与图表间距"}, "example": "ax.set_title('My Plot')\nax.set_title('Left Title', loc='left', fontsize=14)"},
+    {"name": "legend", "desc": "显示图例", "syntax": "ax.legend(labels=None, loc='best', **kwargs)", "params": {"loc": "位置代码或字符串", "fontsize": "字体大小", "frameon": "是否显示边框"}, "example": "ax.legend()\nax.legend(['A', 'B'], loc='upper right')\nax.legend(loc='best', frameon=False)"},
+    {"name": "xlim", "desc": "设置X轴范围", "syntax": "ax.set_xlim(left=None, right=None)", "example": "ax.set_xlim(0, 100)\nax.set_xlim(left=0)\nax.set_xlim([xmin, xmax])"},
+    {"name": "ylim", "desc": "设置Y轴范围", "syntax": "ax.set_ylim(bottom=None, top=None)", "example": "ax.set_ylim(0, 50)\nax.set_ylim(bottom=0)"},
+    {"name": "xticks", "desc": "设置X轴刻度", "syntax": "ax.set_xticks(ticks, labels=None)", "example": "ax.set_xticks([0, 1, 2, 3])\nax.set_xticks([0, 1, 2], ['A', 'B', 'C'])\nax.set_xticks([0, 1, 2], rotation=45)"},
+    {"name": "yticks", "desc": "设置Y轴刻度", "syntax": "ax.set_yticks(ticks, labels=None)", "example": "ax.set_yticks([0, 1, 2, 3])\nax.set_yticks([0, 1, 2], ['Low', 'Med', 'High'])"},
+    {"name": "grid", "desc": "显示网格", "syntax": "ax.grid(visible=True, which='major', axis='both', **kwargs)", "params": {"which": "'major', 'minor', 'both'", "axis": "'x', 'y', 'both'", "linestyle": "线型"}, "example": "ax.grid(True)\nax.grid(axis='y', linestyle='--', alpha=0.5)\nax.grid(which='minor', axis='both', linestyle=':')"},
+    {"name": "axhline", "desc": "绘制水平线", "syntax": "ax.axhline(y=0, color=None, linestyle='-', linewidth=None, **kwargs)", "example": "ax.axhline(y=0)\nax.axhline(y=50, color='r', linestyle='--', linewidth=2)"},
+    {"name": "axvline", "desc": "绘制垂直线", "syntax": "ax.axvline(x=0, color=None, linestyle='-', linewidth=None, **kwargs)", "example": "ax.axvline(x=0)\nax.axvline(x=25, color='g', linestyle=':')"},
+    {"name": "axhspan", "desc": "绘制水平区域", "syntax": "ax.axhspan(ymin, ymax, xmin=0, xmax=1, **kwargs)", "example": "ax.axhspan(0, 1, alpha=0.3)"},
+    {"name": "axvspan", "desc": "绘制垂直区域", "syntax": "ax.axvspan(xmin, xmax, **kwargs)", "example": "ax.axvspan(0, 1, alpha=0.3, color='red')"},
+    {"name": "annotate", "desc": "添加注释", "syntax": "ax.annotate(text, xy, xytext=None, arrowprops=None, **kwargs)", "params": {"xy": "箭头指向点", "xytext": "文本位置", "arrowprops": "箭头属性字典"}, "example": "ax.annotate('peak', xy=(3, 10), xytext=(5, 15), arrowprops=dict(arrowstyle='->', color='red'))\nax.annotate('max', xy=(xmax, ymax), fontsize=12, ha='center')"},
+    {"name": "text", "desc": "添加文本", "syntax": "ax.text(x, y, s, fontdict=None, **kwargs)", "params": {"fontsize": "字体大小", "ha": "水平对齐", "va": "垂直对齐"}, "example": "ax.text(0.5, 0.5, 'center', ha='center', va='center')\nax.text(0.1, 0.9, 'Title', transform=ax.transAxes, fontsize=14)"},
+    {"name": "savefig", "desc": "保存图像", "syntax": "plt.savefig(fname, dpi=None, bbox_inches='tight', format=None, **kwargs)", "params": {"dpi": "分辨率", "bbox_inches": "'tight'裁剪空白", "format": "'png', 'pdf', 'svg'"}, "example": "plt.savefig('plot.png')\nplt.savefig('plot.pdf', dpi=300, bbox_inches='tight')\nplt.savefig('plot.svg', format='svg')"},
+    {"name": "show", "desc": "显示图像", "syntax": "plt.show()", "example": "plt.show()  # 在Jupyter中通常不需要"},
+    {"name": "close", "desc": "关闭图形窗口", "syntax": "plt.close(fig=None)", "example": "plt.close()\nplt.close('all')\nplt.close(fig)"},
+    {"name": "clf", "desc": "清除当前图形", "syntax": "plt.clf()", "example": "plt.clf()"},
+    {"name": "cla", "desc": "清除当前轴", "syntax": "plt.cla()", "example": "plt.cla()"},
+    {"name": "subplot2grid", "desc": "不规则子图布局", "syntax": "ax = plt.subplot2grid(shape, loc, rowspan=1, colspan=1)", "example": "ax1 = plt.subplot2grid((2,2), (0,0))\nax2 = plt.subplot2grid((2,2), (0,1), colspan=2)\nax3 = plt.subplot2grid((2,2), (1,0), rowspan=2)"},
+    {"name": "subplot", "desc": "创建子图（指定位置）", "syntax": "plt.subplot(nrows, ncols, index)", "example": "plt.subplot(2, 2, 1)  # 2x2第1个\nplt.subplot(221)  # 简写形式"},
+    {"name": "tick_params", "desc": "设置刻度样式", "syntax": "ax.tick_params(axis='both', **kwargs)", "params": {"axis": "'x', 'y', 'both'", "labelsize": "标签大小", "rotation": "旋转角度"}, "example": "ax.tick_params(axis='x', rotation=45)\nax.tick_params(axis='y', labelsize=10, colors='red')"},
+    {"name": "set_facecolor", "desc": "设置背景色", "syntax": "ax.set_facecolor(color)", "example": "ax.set_facecolor('white')\nax.set_facecolor('#f0f0f0')\nfig.set_facecolor('white')"},
+    {"name": "tight_layout", "desc": "自动调整布局", "syntax": "plt.tight_layout()\nfig.tight_layout()", "example": "plt.tight_layout()\nfig.tight_layout(pad=1.0)"},
+    {"name": "suptitle", "desc": "设置图形总标题", "syntax": "fig.suptitle(t, **kwargs)", "example": "fig.suptitle('Main Title', fontsize=16, fontweight='bold')"},
+    {"name": "add_subplot", "desc": "向图形添加子图", "syntax": "fig.add_subplot(nrows, ncols, index)", "example": "ax = fig.add_subplot(2, 2, 1)"},
+    {"name": "add_axes", "desc": "向图形添加坐标轴", "syntax": "fig.add_axes(rect, projection=None)", "example": "ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])"},
+]
+
+html = '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python 数据处理命令速查</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f7; color: #1d1d1f; height: 100vh; display: flex; }
+        .sidebar { width: 260px; background: #fff; border-right: 1px solid #d2d2d7; display: flex; flex-direction: column; overflow: hidden; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #d2d2d7; }
+        .sidebar-header h1 { font-size: 18px; font-weight: 600; }
+        .sidebar-header p { font-size: 12px; color: #86868b; margin-top: 4px; }
+        .nav-list { flex: 1; overflow-y: auto; padding: 12px 0; }
+        .nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 14px; transition: background 0.15s; }
+        .nav-item:hover { background: #f5f5f7; }
+        .nav-item.active { background: #0071e3; color: #fff; }
+        .nav-item .count { font-size: 12px; background: #f0f0f3; padding: 2px 8px; border-radius: 10px; }
+        .nav-item.active .count { background: rgba(255,255,255,0.2); color: #fff; }
+        .stats { padding: 16px 20px; background: #f5f5f7; border-top: 1px solid #d2d2d7; font-size: 12px; color: #86868b; }
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .search-bar { padding: 16px 24px; background: #fff; border-bottom: 1px solid #d2d2d7; }
+        .search-input { width: 100%; padding: 12px 16px; font-size: 15px; border: 1px solid #d2d2d7; border-radius: 10px; outline: none; transition: border-color 0.15s; }
+        .search-input:focus { border-color: #0071e3; box-shadow: 0 0 0 3px rgba(0,113,227,0.1); }
+        .content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+        .card { background: #fff; border-radius: 12px; border: 1px solid #d2d2d7; overflow: hidden; transition: box-shadow 0.2s; }
+        .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .card-header { padding: 16px 20px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+        .card-title { font-size: 16px; font-weight: 600; color: #0071e3; font-family: 'SF Mono', Monaco, monospace; }
+        .card-actions { display: flex; gap: 8px; align-items: center; }
+        .btn { padding: 6px 12px; font-size: 12px; background: #f5f5f7; border: 1px solid #d2d2d7; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .btn:hover { background: #0071e3; color: #fff; border-color: #0071e3; }
+        .btn.copied { background: #34c759; color: #fff; border-color: #34c759; }
+        .card-desc { padding: 0 20px 12px; font-size: 14px; color: #515154; }
+        .card-syntax { margin: 0 20px 12px; padding: 10px 12px; background: #f5f5f7; border-radius: 8px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; color: #515154; overflow-x: auto; }
+        .card-detail { display: none; padding: 0 20px 20px; border-top: 1px solid #d2d2d7; }
+        .card.expanded .card-detail { display: block; }
+        .card-detail-title { font-size: 13px; font-weight: 600; color: #1d1d1f; margin: 16px 0 8px; }
+        .param-item { display: flex; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+        .param-item:last-child { border-bottom: none; }
+        .param-name { font-family: 'SF Mono', Monaco, monospace; color: #0071e3; min-width: 120px; flex-shrink: 0; }
+        .param-desc { color: #515154; }
+        .card-example { background: #1d1d1f; color: #f5f5f7; padding: 12px; border-radius: 8px; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; overflow-x: auto; white-space: pre-wrap; }
+        .card-example-label { font-size: 11px; color: #86868b; text-transform: uppercase; margin: 12px 0 6px; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #86868b; }
+        .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: #1d1d1f; }
+        .expand-hint { font-size: 11px; color: #86868b; }
+        .chart-placeholder { background: #f5f5f7; border-radius: 8px; padding: 20px; text-align: center; color: #86868b; margin: 12px 0; }
+        .chart-placeholder code { background: #e0e0e0; padding: 2px 6px; border-radius: 4px; color: #515154; }
+        @media (max-width: 768px) { body { flex-direction: column; } .sidebar { width: 100%; height: auto; max-height: 200px; } .cards { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>Python 数据处理</h1>
+            <p>离线速查工具</p>
+        </div>
+        <nav class="nav-list" id="navList"></nav>
+        <div class="stats" id="stats"></div>
+    </aside>
+    <main class="main">
+        <div class="search-bar">
+            <input type="text" class="search-input" id="searchInput" placeholder="搜索函数名或描述...">
+        </div>
+        <div class="content" id="content">
+            <div class="cards" id="cards"></div>
+        </div>
+    </main>
+
+<script>
+const commands = ''' + json.dumps({
+    "pandas": pandas_commands,
+    "numpy": numpy_commands,
+    "seaborn": seaborn_commands,
+    "matplotlib": matplotlib_commands
+}, ensure_ascii=False) + ''';
+
+let currentLibrary = 'all';
+let searchQuery = '';
+
+function init() { renderNav(); renderCards(); updateStats(); }
+
+function renderNav() {
+    const navList = document.getElementById('navList');
+    const total = Object.values(commands).reduce((a, b) => a + b.length, 0);
+    let html = `<div class="nav-item ${currentLibrary === 'all' ? 'active' : ''}" onclick="selectLibrary('all')">全部<span class="count">${total}</span></div>`;
+    ['pandas', 'numpy', 'seaborn', 'matplotlib'].forEach(lib => {
+        html += `<div class="nav-item ${currentLibrary === lib ? 'active' : ''}" onclick="selectLibrary('${lib}')">${lib}<span class="count">${commands[lib].length}</span></div>`;
+    });
+    navList.innerHTML = html;
+}
+
+function selectLibrary(lib) { currentLibrary = lib; renderNav(); renderCards(); }
+
+function renderCards() {
+    const container = document.getElementById('cards');
+    const libs = currentLibrary === 'all' ? Object.keys(commands) : [currentLibrary];
+    let html = '';
+    libs.forEach(lib => {
+        commands[lib].forEach(cmd => {
+            const q = searchQuery.toLowerCase();
+            if (q && !cmd.name.toLowerCase().includes(q) && !cmd.desc.toLowerCase().includes(q)) return;
+            html += `
+<div class="card" data-lib="${lib}" data-name="${cmd.name}">
+    <div class="card-header" onclick="toggleCard(this.parentElement)">
+        <span class="card-title">${cmd.name}</span>
+        <div class="card-actions">
+            <button class="btn" onclick="event.stopPropagation(); copyCode(this, '${escapeForJS(cmd.example)}')" title="复制示例">复制</button>
+            <span class="expand-hint">点击展开</span>
+        </div>
+    </div>
+    <div class="card-desc">${cmd.desc}</div>
+    <div class="card-syntax">${escapeHtml(cmd.syntax)}</div>
+    <div class="card-detail">
+        ${getParamsHtml(cmd)}
+        <div class="card-example-label">示例代码</div>
+        <pre class="card-example">${escapeHtml(cmd.example)}</pre>
+        ${getChartHint(cmd)}
+    </div>
+</div>`;
+        });
+    });
+    if (!html) html = '<div class="empty-state"><h3>没有找到匹配的命令</h3><p>尝试其他关键词</p></div>';
+    container.innerHTML = html;
+    updateStats();
+}
+
+function getParamsHtml(cmd) {
+    if (!cmd.params) return '';
+    let html = '<div class="card-detail-title">参数说明</div>';
+    for (const [k, v] of Object.entries(cmd.params)) {
+        html += `<div class="param-item"><span class="param-name">${k}</span><span class="param-desc">${v}</span></div>`;
+    }
+    return html;
+}
+
+function getChartHint(cmd) {
+    const chartTypes = {
+        'scatterplot': '散点图', 'lineplot': '折线图', 'barplot': '条形图',
+        'histplot': '直方图', 'heatmap': '热力图', 'boxplot': '箱线图',
+        'violinplot': '小提琴图', 'pairplot': '配对图', 'kdeplot': '密度图',
+        'plot': '折线图', 'scatter': '散点图', 'bar': '条形图', 'barh': '水平条形图',
+        'hist': '直方图', 'pie': '饼图', 'boxplot': '箱线图', 'imshow': '热力图',
+        'contour': '等高线图', 'fill_between': '填充区域图', 'step': '阶梯图',
+        'errorbar': '误差棒图', 'stem': '离散序列图', 'subplots': '多子图'
+    };
+    if (chartTypes[cmd.name]) {
+        return `<div class="chart-placeholder">图表示例: <code>${chartTypes[cmd.name]}</code><br>请在 Jupyter Notebook 或 Python 环境中运行查看</div>`;
+    }
+    return '';
+}
+
+function toggleCard(card) { card.classList.toggle('expanded'); }
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function escapeForJS(text) {
+    return text.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\'").replace(/\\n/g, '\\\\n');
+}
+
+function copyCode(btn, code) {
+    navigator.clipboard.writeText(code.replace(/\\n/g, '\\n')).then(() => {
+        btn.textContent = '已复制!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+    });
+}
+
+function updateStats() {
+    const total = Object.values(commands).reduce((a, b) => a + b.length, 0);
+    document.getElementById('stats').textContent = `总计 ${total} 个命令`;
+}
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    renderCards();
+});
+
+init();
+</script>
+</body>
+</html>'''
+
+with open('index.html', 'w', encoding='utf-8') as f:
+    f.write(html)
+
+print(f"index.html generated successfully!")
+print(f"Total commands: pandas={len(pandas_commands)}, numpy={len(numpy_commands)}, seaborn={len(seaborn_commands)}, matplotlib={len(matplotlib_commands)}")
