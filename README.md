@@ -2,7 +2,7 @@
 
 一个**离线可用的** Python 数据处理指令查询网页，无需安装任何依赖，直接双击 HTML 文件即可使用。
 
-![Version](https://img.shields.io/badge/version-v3.1.1-blue)
+![Version](https://img.shields.io/badge/version-v3.1.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -88,6 +88,7 @@ python -m http.server 8000
 
 | 版本 | 更新内容 |
 |---|---|
+| **v3.1.2** | 修复 JSON 数据缺少逗号导致的空白页面问题 |
 | **v3.1.1** | 新增 Python 标准库（os, json, re, datetime, glob, pathlib）、collections 容器库；扩展 scipy/numpy/pandas 指令共 20+ 条 |
 | **v3.0** | 增强参数文档，添加官方完整参数、类型标签、必需/可选标识、默认值显示、参数折叠区 |
 | **v2.0** | 添加 SciPy 库支持、14 类 SVG 图形预览、场景导航增强 |
